@@ -1,0 +1,103 @@
+USE [Database];
+GO
+ 
+SET ANSI_NULLS ON;
+GO
+SET QUOTED_IDENTIFIER ON;
+GO
+ 
+IF NOT EXISTS (SELECT * FROM INFORMATION_SCHEMA.ROUTINES WHERE ROUTINE_NAME = 'usp_procName')
+EXEC ('CREATE PROC dbo.usp_procName AS SELECT ''stub version of usp_procName, to be replaced''')
+GO
+ 
+ALTER PROCEDURE dbo.usp_procName
+AS
+/*********************************************************************************
+Name:           usp_procName
+Author:         Kirsten Benzel
+Purpose:        xxxxx
+Called by:      xxxxx
+Calls:          Nothing
+ 
+DATE            USER          PROJECT             DESCRIPTION
+09/00/2014      kirstenb      XXXXXXX             Create procedure new
+*********************************************************************************
+Sample Calls:
+EXEC dbo.usp_procName
+*********************************************************************************/
+-- common use
+SET NOCOUNT ON;
+SET XACT_ABORT ON;
+SET TRANSACTION ISOLATION LEVEL READ UNCOMMITTED;
+ 
+-- uncommon use
+SET TRANSACTION ISOLATION LEVEL SNAPSHOT; -- http://www.jasonstrate.com/2012/06/the-side-effect-of-nolock/
+SET ARITHABORT ON;
+SET ANSI_PADDING ON;
+SET ANSI_WARNINGS ON;
+SET NUMERIC_ROUNDABORT OFF;
+SET DEADLOCK_PRIORITY Normal; -- low{-5} normal{0} high{5} {-10 ... 0 ... 10}
+SET CONCAT_NULL_YIELDS_NULL ON;
+SET QUERY_GOVERNOR_COST_LIMIT 60;
+ 
+IF @@TRANCOUNT = 0
+  BEGIN TRY
+  
+       -- RAISERROR \ Sanity Check
+       IF EXISTS(SELECT TOP 1 0 FROM dbo.SomeTable)
+       IF NOT EXISTS(SELECT TOP 1 0 FROM dbo.SomeTable)
+       IF LEN(@SomeParameter) < 0
+       IF @SomeParameter IS NULL 
+ 
+              -- Three types of error handlers to choose from:
+              -- Severe: Return fatal error, return information in CATCH block, terminate client connection, log error in error and application logs, page on call DBA.
+              RAISERROR (N'<<%3.440s>>', 20, -1, N'Error Message!'); WITH NOWAIT, LOG;
+      
+              -- Hand Slap: RAISERROR inside TRY block & return information in CATCH block to user
+              RAISERROR (N'%*.*s', 11, -1, -10, 440, N'Error Message!') WITH NOWAIT;
+ 
+              -- Throw. Supposedly replacing RAISERROR in future versions of SQL. Not a fan.
+              THROW 50000, 'Problem.', 1;
+ 
+       -- Clear out any existing local or global temp tables  
+       IF OBJECT_ID('tempdb.dbo.#TempTable','U') IS NOT NULL DROP TABLE #TempTable;
+       IF OBJECT_ID('tempdb.dbo.##TempTable','U') IS NOT NULL DROP TABLE ##TempTable;
+ 
+       -- Prepatory Code goes here!
+   
+   BEGIN TRAN
+   
+      -- UPD/INS/DEL goes here!
+   
+   COMMIT TRAN
+ 
+  END TRY
+ 
+   BEGIN CATCH
+      
+       --XACT_STATE: 1=trans is committable, -1=trans uncommittable & should be rolled back, 0=no trans exists and commit/rollback would error
+       IF @@TRANCOUNT > 0 AND (XACT_STATE()) = -1
+              ROLLBACK TRANSACTION
+ 
+                     DECLARE @ErrorReturnMessage NVARCHAR(MAX) = (SELECT
+                           'Error in ' + CONVERT(VARCHAR(256),ERROR_PROCEDURE()) +
+                           ', Number ' + CONVERT(VARCHAR(256),ERROR_NUMBER()) +
+                           ', Severity ' + CONVERT(VARCHAR(256),ERROR_SEVERITY()) +
+                           ', State ' + CONVERT(VARCHAR(256),ERROR_STATE()) +
+                           ', Line ' + CONVERT(VARCHAR(256),ERROR_LINE()) +
+                           ', Message: "' + CONVERT(VARCHAR(256),ERROR_MESSAGE()) + '"');
+ 
+              RAISERROR (@ErrorReturnMessage, 11, -1) WITH NOWAIT;
+              RETURN -1
+                    
+  END CATCH
+  
+SET NOCOUNT OFF;
+RETURN 0;
+GO
+ 
+IF USER_ID('xx_execprocs') IS NOT NULL
+GRANT EXECUTE ON dbo.usp_procName TO xx_execprocs;
+ELSE
+RAISERROR('Warning: User Role "xx_execprocs" Does not exist in this database!', 16, 1);
+GO

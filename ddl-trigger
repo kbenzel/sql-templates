@@ -1,0 +1,98 @@
+USE [Dev_Database]
+GO
+
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+
+CREATE TABLE dbo.app_DatabaseLog
+(
+	DatabaseLogID   INT             IDENTITY(1,1) NOT NULL,
+	DatabaseUser    SYSNAME         NOT NULL,
+	HostName        NVARCHAR(100)   NULL,
+	ApplicationName NVARCHAR(100)   NULL,
+	Event           SYSNAME         NOT NULL,
+	SchemaType      SYSNAME         NULL,
+	Object          SYSNAME         NULL,
+	TSQL            NVARCHAR(MAX)   NOT NULL,
+	XmlEvent        XML             NOT NULL,
+	ModifyDate      DATETIME        NOT NULL
+)
+
+ALTER TABLE dbo.app_DatabaseLog ADD 
+    CONSTRAINT app_DatabaseLog_DatabaseLogID_INDEX_P1 PRIMARY KEY CLUSTERED 
+        (DatabaseLogID ASC) WITH FILLFACTOR = 90;  
+GO
+
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+
+CREATE TRIGGER ddlDatabaseTriggerLog_tr
+ON DATABASE 
+FOR DDL_DATABASE_LEVEL_EVENTS 
+AS 
+BEGIN
+    SET NOCOUNT ON;
+
+    DECLARE @Data XML;
+    DECLARE @SchemaType sysname;
+    DECLARE @Object sysname;
+    DECLARE @EventType sysname;
+
+    SET @Data = EVENTDATA();
+    SET @EventType = @Data.value('(/EVENT_INSTANCE/EventType)[1]', 'sysname');
+    SET @SchemaType = @Data.value('(/EVENT_INSTANCE/SchemaName)[1]', 'sysname');
+    SET @Object = @Data.value('(/EVENT_INSTANCE/ObjectName)[1]', 'sysname') 
+
+    IF @Object IS NOT NULL
+        PRINT '  ' + @EventType + ' - ' + @SchemaType + '.' + @Object;
+    ELSE
+        PRINT '  ' + @EventType + ' - ' + @SchemaType;
+
+    IF @EventType IS NULL
+        PRINT CONVERT(nvarchar(max), @Data);
+
+    IF @EventType NOT LIKE '%statistics%'
+    BEGIN 
+      INSERT dbo.app_DatabaseLog 
+      (
+          DatabaseUser,
+          HostName,
+          ApplicationName,  
+          Event, 
+          SchemaType, 
+          Object, 
+          TSQL, 
+          XmlEvent,
+          ModifyDate
+      ) 
+      VALUES 
+      (
+          CONVERT(SYSNAME, ISNULL(NULLIF(SYSTEM_USER, ''), CURRENT_USER)), 
+          HOST_NAME(), 
+          APP_NAME(),
+          @EventType, 
+          CONVERT(SYSNAME, @SchemaType), 
+          CONVERT(SYSNAME, @Object), 
+          ISNULL(@Data.value('(/EVENT_INSTANCE/TSQLCommand)[1]', 'NVARCHAR(MAX)'), 'TSQL not available in EVENT_DATA'), 
+          @Data,
+          GETDATE() 
+      );
+    END 
+END;
+GO
+
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+
+--DISABLE TRIGGER ddlDatabaseTriggerLog_tr ON DATABASE
+--GO
+ENABLE TRIGGER ddlDatabaseTriggerLog_tr ON DATABASE
+GO
+
+
